@@ -1,31 +1,120 @@
 package frc.robot.subsystems;
 
-import com.ctre.phoenix6.hardware.Pigeon2;
-import com.ctre.phoenix6.swerve.jni.SwerveJNI.ModulePosition;
+import java.util.Arrays;
+
 
 import edu.wpi.first.math.VecBuilder;
-import edu.wpi.first.math.estimator.SwerveDrivePoseEstimator;
 import edu.wpi.first.math.geometry.Pose2d;
-import edu.wpi.first.math.kinematics.SwerveModulePosition;
-import edu.wpi.first.math.util.Units;
+import edu.wpi.first.networktables.NetworkTableInstance;
+import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
+import edu.wpi.first.wpilibj2.command.Command;
+import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
+import frc.robot.LimelightHelpers;
+import frc.robot.Robot;
+import frc.robot.Telemetry;
 import frc.robot.generated.TunerConstants;
-import frc.robot.generated.TunerConstants.TunerSwerveDrivetrain;
 
-public class Pose extends SubsystemBase{
-    private Pigeon2 gyro; 
-    public final CommandSwerveDrivetrain drivetrain = TunerConstants.createDrivetrain();
- 
-private final SwerveDrivePoseEstimator m_poseEstimator =
-      new SwerveDrivePoseEstimator(
-            drivetrain.getKinematics(),
-          gyro.getRotation2d(),
-        drivetrain.getModuleLocations(),
-          new Pose2d(),
-          VecBuilder.fill(0.05, 0.05, Units.degreesToRadians(5)),
-          VecBuilder.fill(0.5, 0.5, Units.degreesToRadians(30)));
+public class PoseSubsystem extends SubsystemBase{
+private final CommandSwerveDrivetrain drivetrain;
+
+public PoseSubsystem(CommandSwerveDrivetrain drivetrain) {
+  this.drivetrain = drivetrain;
+}
+
+private static final String LIMELIGHTS[] = { "limelight-fleft", "limelight-fright" };
+
+public void Pose() { 
+  if (!LimelightHelpers.getTV("limelight-fleft")) {
+    return;
+  }
+  drivetrain.getPigeon2()
+  .setYaw(LimelightHelpers.getBotPoseEstimate_wpiBlue("limelight-fleft").pose.getRotation().getDegrees());
+drivetrain.resetPose(
+  new Pose2d(LimelightHelpers.getBotPoseEstimate_wpiBlue_MegaTag2("limelight-fleft").pose.getTranslation(),
+          drivetrain.getPigeon2().getRotation2d()));
+}
+
+    public Command getPigeonInfo() {
+        return run(() -> Pose()).until(() -> LimelightHelpers.getTV("limelight-fleft"));
+    }
+
+    private void updateVisionMeasurement(String limelight_name) {
+        LimelightHelpers.SetRobotOrientation(limelight_name,
+                drivetrain.getEstimatedPosition().getRotation().getDegrees(), 0, 0,
+                0, 0, 0);
+
+        double[] targetPose_CameraSpace = LimelightHelpers.getTargetPose_CameraSpace(limelight_name);
+
+        LimelightHelpers.PoseEstimate mt2 = LimelightHelpers.getBotPoseEstimate_wpiBlue_MegaTag2(limelight_name);
+        if (mt2 == null) {
+            // failed to get mt2 or it's not new
+            SmartDashboard.putNumber("status", -1);
+            return;
+        } else if (mt2.tagCount == 0) {
+            // no tags
+            SmartDashboard.putNumber("status", -2);
+            return;
+        } else if (drivetrain.getPigeon2().getAngularVelocityZWorld().getValueAsDouble() > 360) {
+            // something has probably gone very wrong or this measurement will not be great
+            SmartDashboard.putNumber("status", -3);
+            return;
+        } else if (mt2.pose.getTranslation().getDistance(drivetrain.getEstimatedPosition().getTranslation()) > 1) {
+            // limelight estimation is more than 1 meter away from the robot
+            SmartDashboard.putNumber("status", -4);
+            return;
+        } else if (targetPose_CameraSpace != null && targetPose_CameraSpace.length == 6
+                && (Math.sqrt(targetPose_CameraSpace[0] * targetPose_CameraSpace[0]
+                        + targetPose_CameraSpace[1] * targetPose_CameraSpace[1]) > 1)) {
+            // limelight is more than 1 meter away from the target
+            SmartDashboard.putNumber("poseestimator_status", -5);
+            return;
+        } else {
+            SmartDashboard.putNumber("poseestimator_status", 0);
+        }
+
+        double[] stddevs = NetworkTableInstance.getDefault().getTable(limelight_name).getEntry("stddevs")
+                .getDoubleArray(new double[12]);
+        double mt2xdev = stddevs[6];
+        double mt2ydev = stddevs[7];
+        drivetrain.addVisionMeasurement(mt2.pose, mt2.timestampSeconds, VecBuilder.fill(mt2xdev, mt2ydev, 9999999));
+
+        if (Double.isNaN(drivetrain.getEstimatedPosition().getX())
+                || Double.isInfinite(drivetrain.getEstimatedPosition().getX()) ||
+                Double.isNaN(drivetrain.getEstimatedPosition().getY())
+                || Double.isInfinite(drivetrain.getEstimatedPosition().getY())) {
+            drivetrain.resetPose(LimelightHelpers.getBotPose2d_wpiBlue(limelight_name));
+            System.out.println("had to reset pose estimator due to detected NaN");
+        }
+}
 
 
+
+public void periodic() {
+  for (String limelight : LIMELIGHTS) {
+      updateVisionMeasurement(limelight);
+  }
+
+       Telemetry.field.setRobotPose(drivetrain.getEstimatedPosition());
+}
+
+    public void scheduleWaitForApriltagCommand() {
+        Commands.idle(this) // do nothing
+                .until(() -> { // until any limelight sees a tag
+                    return Arrays.stream(LIMELIGHTS).anyMatch(limelight -> LimelightHelpers.getTV(limelight));
+                })
+                .andThen(runOnce(() -> { // and then reset the robot pose
+                    for (String limelight : LIMELIGHTS) {
+                        if (LimelightHelpers.getTV(limelight)) {
+                            drivetrain.resetPose(LimelightHelpers.getBotPose2d(limelight));
+                            System.out.println("Robot pose set to mt1 report from " + limelight);
+                            break;
+                        }
+                    }
+                }))
+                .schedule();
+    }
 
 }
+
 
