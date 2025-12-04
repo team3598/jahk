@@ -247,6 +247,10 @@ public class CommandSwerveDrivetrain extends TunerSwerveDrivetrain implements Su
             
     }
 
+public final Pose2d getEstimatedPosition() {
+        return getState().Pose;
+    }
+
     private void startSimThread() {
         m_lastSimTime = Utils.getCurrentTimeSeconds();
 

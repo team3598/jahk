@@ -24,7 +24,7 @@ public PoseSubsystem(CommandSwerveDrivetrain drivetrain) {
 
 private static final String LIMELIGHTS[] = { "limelight-fleft", "limelight-fright" };
 
-public void Pose() { 
+public void seedPigeon() { 
   if (!LimelightHelpers.getTV("limelight-fleft")) {
     return;
   }
@@ -36,7 +36,7 @@ drivetrain.resetPose(
 }
 
     public Command getPigeonInfo() {
-        return run(() -> Pose()).until(() -> LimelightHelpers.getTV("limelight-fleft"));
+        return run(() -> seedPigeon()).until(() -> LimelightHelpers.getTV("limelight-fleft"));
     }
 
     private void updateVisionMeasurement(String limelight_name) {
