@@ -95,7 +95,7 @@ public void periodic() {
       updateVisionMeasurement(limelight);
   }
 
-       Telemetry.field.setRobotPose(drivetrain.getEstimatedPosition());
+ 
 }
 
     public void scheduleWaitForApriltagCommand() {
