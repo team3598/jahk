@@ -66,7 +66,7 @@ drivetrain.resetPose(
         } else if (targetPose_CameraSpace != null && targetPose_CameraSpace.length == 6
                 && (Math.sqrt(targetPose_CameraSpace[0] * targetPose_CameraSpace[0]
                         + targetPose_CameraSpace[1] * targetPose_CameraSpace[1]) > 1)) {
-            // limelight is more than 1 meter away from the target
+            // limelight is more than 1 meter away from the target, pythagorean theorem to figure out total distance from target and compares it to 1
             SmartDashboard.putNumber("poseestimator_status", -5);
             return;
         } else {

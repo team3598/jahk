@@ -4,6 +4,11 @@
 
 package frc.robot;
 
+import com.ctre.phoenix6.sim.ChassisReference;
+import com.ctre.phoenix6.swerve.SwerveRequest;
+import com.ctre.phoenix6.swerve.SwerveRequest.ApplyRobotSpeeds;
+
+import edu.wpi.first.math.kinematics.ChassisSpeeds;
 import edu.wpi.first.wpilibj.TimedRobot;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.CommandScheduler;
@@ -33,6 +38,7 @@ public class Robot extends TimedRobot {
 
   @Override
   public void autonomousInit() {
+    ChassisSpeeds zeroSpeeds = new ChassisSpeeds(0.0, 0.0, 0.0);
     m_autonomousCommand = m_robotContainer.getAutonomousCommand();
 
     if (m_autonomousCommand != null) {
@@ -41,9 +47,19 @@ public class Robot extends TimedRobot {
   }
 
   @Override
-  public void autonomousPeriodic() {}
+  public void autonomousPeriodic() {
+    boolean target_valid = LimelightHelpers.getTV("limelight-fleft");
+    double target_x_pos = LimelightHelpers.getTX("limelight-fleft");
+    if (target_valid) {
+      System.out.println(target_x_pos);
+      
+      
+    } else {
+      System.out.println("not valid");
+    }
+  }
 
-  @Override
+  @Override   
   public void autonomousExit() {}
 
   @Override

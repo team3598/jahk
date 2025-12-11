@@ -329,8 +329,6 @@ public final Pose2d getEstimatedPosition() {
         }
 
 }
-public final Pose2d getEstimatedPosition() {
-return getState().Pose; 
-}
+
 
 }
